@@ -62,6 +62,7 @@ interface GameStore {
   showStats: boolean;
   stabilizers: number;
   stabilizerMode: boolean;
+  stabilizerFeedback: string | null;
 
   selectCandy: (pos: Position) => void;
   processSwap: (pos1: Position, pos2: Position) => void;
@@ -74,6 +75,7 @@ interface GameStore {
   changeStation: (stationId: string) => void;
   toggleStabilizerMode: () => void;
   useStabilizer: (pos: Position) => void;
+  clearStabilizerFeedback: () => void;
   persist: () => void;
 }
 
@@ -100,6 +102,7 @@ const useGameStore = create<GameStore>((set, get) => {
     showStats: false,
     stabilizers: persisted?.stabilizers ?? INITIAL_STABILIZERS,
     stabilizerMode: false,
+    stabilizerFeedback: null,
 
     persist: () => {
       const s = get();
@@ -128,6 +131,12 @@ const useGameStore = create<GameStore>((set, get) => {
         const candy = board[pos.row][pos.col];
         if (candy && candy.isUnstable && !candy.isStabilized) {
           get().useStabilizer(pos);
+        } else if (candy && candy.isUnstable && candy.isStabilized) {
+          set({ stabilizerFeedback: '该糖果已被稳定，无需再次使用稳定剂' });
+          setTimeout(() => get().clearStabilizerFeedback(), 1500);
+        } else {
+          set({ stabilizerFeedback: '请点击带有倒计时的不稳定糖果' });
+          setTimeout(() => get().clearStabilizerFeedback(), 1500);
         }
         return;
       }
@@ -152,9 +161,7 @@ const useGameStore = create<GameStore>((set, get) => {
       const specialInfo = checkSwapHasSpecial(pos1, pos2, board);
 
       if (specialInfo.hasSpecial && specialInfo.specialPos && specialInfo.specialType) {
-        let newBoard = swapCandies(board, pos1, pos2);
-        newBoard = decrementUnstableCandies(newBoard);
-        newBoard = transformExpiredCandies(newBoard);
+        const newBoard = swapCandies(board, pos1, pos2);
         const forced = triggerSpecialCandy(
           newBoard,
           specialInfo.specialPos,
@@ -175,13 +182,10 @@ const useGameStore = create<GameStore>((set, get) => {
         return;
       }
 
-      let newBoard = swapCandies(board, pos1, pos2);
+      const newBoard = swapCandies(board, pos1, pos2);
       const matches = findAllMatches(newBoard);
 
       if (matches.length > 0) {
-        newBoard = decrementUnstableCandies(newBoard);
-        newBoard = transformExpiredCandies(newBoard);
-
         set({
           board: newBoard,
           moves: moves - 1,
@@ -190,7 +194,7 @@ const useGameStore = create<GameStore>((set, get) => {
         });
 
         setTimeout(() => {
-          get().processMatches();
+          get().processMatches(matches);
         }, 200);
       } else {
         set({ board: newBoard });
@@ -263,6 +267,10 @@ const useGameStore = create<GameStore>((set, get) => {
           hasMatches = await processOneRound(round);
           round++;
         }
+
+        currentBoard = decrementUnstableCandies(currentBoard);
+        currentBoard = transformExpiredCandies(currentBoard);
+        set({ board: currentBoard });
 
         const candyCounts = countClearedCandies(allMatches);
         const { train: newTrain } = loadCandiesToTrain(get().train, candyCounts);
@@ -429,9 +437,14 @@ const useGameStore = create<GameStore>((set, get) => {
         board: newBoard,
         stabilizers: stabilizers - 1,
         stabilizerMode: false,
+        stabilizerFeedback: null,
       });
 
       get().persist();
+    },
+
+    clearStabilizerFeedback: () => {
+      set({ stabilizerFeedback: null });
     },
   };
 });

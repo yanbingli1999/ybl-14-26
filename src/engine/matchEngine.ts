@@ -685,7 +685,6 @@ export function convertMatchedUnstableToCrystal(
         isUnstable: false,
         unstableStepsLeft: null,
         isStabilized: false,
-        isMatched: false,
       };
     }
   }
