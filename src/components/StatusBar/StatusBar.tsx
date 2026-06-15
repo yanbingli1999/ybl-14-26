@@ -1,8 +1,8 @@
 import useGameStore from '@/store/useGameStore';
-import { Zap, Star, Coins, Footprints, BarChart3, RotateCcw } from 'lucide-react';
+import { Zap, Star, Coins, Footprints, BarChart3, RotateCcw, FlaskConical } from 'lucide-react';
 
 export default function StatusBar() {
-  const { score, moves, combo, maxCombo, profile, setShowStats, resetGame } = useGameStore();
+  const { score, moves, combo, maxCombo, profile, setShowStats, resetGame, stabilizers, stabilizerMode, toggleStabilizerMode } = useGameStore();
 
   return (
     <div className="bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 rounded-2xl p-4 shadow-xl">
@@ -55,6 +55,25 @@ export default function StatusBar() {
           </div>
 
           <button
+            onClick={toggleStabilizerMode}
+            className={`relative p-2 rounded-xl transition-colors ${
+              stabilizerMode
+                ? 'bg-yellow-400 hover:bg-yellow-300'
+                : stabilizers > 0
+                ? 'bg-white/20 hover:bg-white/30'
+                : 'bg-white/10 opacity-50 cursor-not-allowed'
+            }`}
+            title={stabilizerMode ? '取消稳定剂模式' : `使用稳定剂 (剩余 ${stabilizers})`}
+          >
+            <FlaskConical className={`w-5 h-5 ${stabilizerMode ? 'text-yellow-900' : 'text-white'}`} />
+            {stabilizers > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-yellow-400 text-yellow-900 text-xs font-bold flex items-center justify-center">
+                {stabilizers}
+              </span>
+            )}
+          </button>
+
+          <button
             onClick={() => setShowStats(true)}
             className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
             title="统计数据"
@@ -71,6 +90,14 @@ export default function StatusBar() {
           </button>
         </div>
       </div>
+
+      {stabilizerMode && (
+        <div className="mt-2 text-center">
+          <span className="inline-block px-4 py-1 bg-yellow-400 text-yellow-900 rounded-full font-bold text-sm animate-pulse">
+            🔬 稳定剂模式已开启 - 点击不稳定糖果锁定类型
+          </span>
+        </div>
+      )}
 
       {combo > 1 && (
         <div className="mt-2 text-center">

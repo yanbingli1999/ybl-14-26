@@ -3,7 +3,7 @@ import CandyCell from './CandyCell';
 import { BOARD_SIZE } from '@/types';
 
 export default function GameBoard() {
-  const { board, selectedCandy, selectCandy, isAnimating, gamePhase } = useGameStore();
+  const { board, selectedCandy, selectCandy, isAnimating, gamePhase, stabilizerMode } = useGameStore();
 
   const handleCellClick = (row: number, col: number) => {
     if (isAnimating || gamePhase !== 'playing') return;
@@ -12,6 +12,11 @@ export default function GameBoard() {
 
   return (
     <div className="relative">
+      {stabilizerMode && (
+        <div className="absolute -top-8 left-0 right-0 text-center text-sm font-bold text-yellow-600 animate-pulse z-10">
+          🔬 稳定剂模式 - 点击不稳定糖果锁定类型
+        </div>
+      )}
       <div
         className="grid gap-1 sm:gap-1.5 p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 shadow-xl"
         style={{
@@ -30,6 +35,7 @@ export default function GameBoard() {
                 selectedCandy?.row === rowIndex && selectedCandy?.col === colIndex
               }
               onClick={() => handleCellClick(rowIndex, colIndex)}
+              stabilizerMode={stabilizerMode}
             />
           ))
         )}

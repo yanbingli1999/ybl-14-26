@@ -86,6 +86,8 @@ export default function Home() {
             <li>• 匹配度高获得奖励，错装会被扣除罚金</li>
             <li>• 完成订单获得信誉，解锁更多车站</li>
             <li>• 4连消生成炸弹糖（范围消除），5连消生成彩虹糖（消除同色）</li>
+            <li>• <span className="text-orange-500 font-medium">⚠️ 不稳定糖果</span>：带倒计数的糖果，在倒计数内消除可变为高价值💎晶糖，超时则随机变为其他类型</li>
+            <li>• <span className="text-cyan-500 font-medium">🔬 稳定剂</span>：可锁定不稳定糖果的类型，防止其变化（点击烧杯图标开启稳定剂模式后点击糖果）</li>
           </ul>
         </div>
 

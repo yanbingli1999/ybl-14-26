@@ -1,5 +1,5 @@
 import { Candy, Position, MatchResult, CandyType, SpecialCandyType, BOARD_SIZE, BASIC_CANDY_TYPES } from '@/types';
-import { GAME_CONFIG } from '@/data/config';
+import { GAME_CONFIG, UNSTABLE_CANDY_CONFIG, CANDY_CONFIG } from '@/data/config';
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 9);
@@ -9,7 +9,17 @@ function getRandomCandyType(): CandyType {
   return BASIC_CANDY_TYPES[Math.floor(Math.random() * BASIC_CANDY_TYPES.length)];
 }
 
-export function createCandy(row: number, col: number, type?: CandyType): Candy {
+function shouldSpawnUnstable(): boolean {
+  return Math.random() < UNSTABLE_CANDY_CONFIG.SPAWN_CHANCE;
+}
+
+function getRandomCountdown(): number {
+  return UNSTABLE_CANDY_CONFIG.MIN_COUNTDOWN +
+    Math.floor(Math.random() * (UNSTABLE_CANDY_CONFIG.MAX_COUNTDOWN - UNSTABLE_CANDY_CONFIG.MIN_COUNTDOWN + 1));
+}
+
+export function createCandy(row: number, col: number, type?: CandyType, forceUnstable?: boolean): Candy {
+  const isUnstable = forceUnstable ?? shouldSpawnUnstable();
   return {
     id: generateId(),
     type: type || getRandomCandyType(),
@@ -19,6 +29,9 @@ export function createCandy(row: number, col: number, type?: CandyType): Candy {
     specialType: null,
     isMatched: false,
     isFalling: false,
+    isUnstable,
+    unstableStepsLeft: isUnstable ? getRandomCountdown() : null,
+    isStabilized: false,
   };
 }
 
@@ -36,6 +49,9 @@ export function createSpecialCandy(row: number, col: number, specialType: Specia
     specialType,
     isMatched: false,
     isFalling: false,
+    isUnstable: false,
+    unstableStepsLeft: null,
+    isStabilized: false,
   };
 }
 
@@ -560,6 +576,12 @@ export function calculateScore(matches: MatchResult[], combo: number): number {
       const lengthBonus = match.candies.length > 3 ? (match.candies.length - 3) * 20 : 0;
       score += baseScore + lengthBonus;
     }
+
+    for (const candy of match.candies) {
+      if (candy.isUnstable) {
+        score += CANDY_CONFIG.crystal.points * UNSTABLE_CANDY_CONFIG.CRYSTAL_BONUS_MULTIPLIER;
+      }
+    }
   }
 
   const comboMultiplier = 1 + combo * GAME_CONFIG.COMBO_BONUS_MULTIPLIER;
@@ -596,4 +618,95 @@ export function hasValidMoves(board: (Candy | null)[][]): boolean {
     }
   }
   return false;
+}
+
+export function decrementUnstableCandies(board: (Candy | null)[][]): (Candy | null)[][] {
+  return board.map(row =>
+    row.map(candy => {
+      if (!candy) return null;
+      if (!candy.isUnstable || candy.isStabilized) return candy;
+      const newSteps = (candy.unstableStepsLeft ?? 0) - 1;
+      return { ...candy, unstableStepsLeft: newSteps };
+    })
+  );
+}
+
+export function transformExpiredCandies(board: (Candy | null)[][]): (Candy | null)[][] {
+  return board.map(row =>
+    row.map(candy => {
+      if (!candy) return null;
+      if (!candy.isUnstable || candy.isStabilized) return candy;
+      if ((candy.unstableStepsLeft ?? 0) > 0) return candy;
+      const newType = getRandomCandyType();
+      return {
+        ...candy,
+        type: newType,
+        isUnstable: false,
+        unstableStepsLeft: null,
+        isStabilized: false,
+      };
+    })
+  );
+}
+
+export function convertMatchedUnstableToCrystal(
+  board: (Candy | null)[][],
+  matches: MatchResult[]
+): (Candy | null)[][] {
+  const matchedPositions = new Set<string>();
+  for (const match of matches) {
+    for (const pos of match.positions) {
+      matchedPositions.add(`${pos.row},${pos.col}`);
+    }
+  }
+
+  const crystalPositions = new Set<string>();
+
+  for (const match of matches) {
+    for (const candy of match.candies) {
+      if (candy.isUnstable && matchedPositions.has(`${candy.row},${candy.col}`)) {
+        crystalPositions.add(`${candy.row},${candy.col}`);
+      }
+    }
+  }
+
+  if (crystalPositions.size === 0) return board;
+
+  const newBoard = board.map(row => row.map(c => c ? { ...c } : null));
+
+  for (const key of crystalPositions) {
+    const [r, c] = key.split(',').map(Number);
+    if (newBoard[r][c] && newBoard[r][c]!.isMatched) {
+      newBoard[r][c] = {
+        ...newBoard[r][c]!,
+        type: 'crystal',
+        isSpecial: true,
+        specialType: 'crystal',
+        isUnstable: false,
+        unstableStepsLeft: null,
+        isStabilized: false,
+        isMatched: false,
+      };
+    }
+  }
+
+  return newBoard;
+}
+
+export function applyStabilizerToCandy(board: (Candy | null)[][], pos: Position): (Candy | null)[][] {
+  const newBoard = board.map(row => row.map(c => c ? { ...c } : null));
+  const candy = newBoard[pos.row][pos.col];
+  if (!candy || !candy.isUnstable || candy.isStabilized) return board;
+  newBoard[pos.row][pos.col] = { ...candy, isStabilized: true };
+  return newBoard;
+}
+
+export function countUnstableCandies(board: (Candy | null)[][]): number {
+  let count = 0;
+  for (const row of board) {
+    for (const candy of row) {
+      if (candy && candy.isUnstable && !candy.isStabilized) count++;
+    }
+  }
+  return count;
 }

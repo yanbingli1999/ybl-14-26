@@ -8,7 +8,17 @@ export const CANDY_CONFIG: Record<CandyType, { name: string; color: string; poin
   grape: { name: '葡萄糖', color: '#9B59B6', points: 10, emoji: '🍇' },
   rainbow: { name: '彩虹糖', color: 'linear-gradient(135deg, #FF6B9D, #FFD93D, #6BCB77, #4D96FF, #9B59B6)', points: 50, emoji: '🌈' },
   bomb: { name: '炸弹糖', color: '#FF4757', points: 30, emoji: '💣' },
+  crystal: { name: '晶糖', color: 'linear-gradient(135deg, #E0FFFF, #87CEEB, #00CED1)', points: 100, emoji: '💎' },
 };
+
+export const UNSTABLE_CANDY_CONFIG = {
+  SPAWN_CHANCE: 0.15,
+  MIN_COUNTDOWN: 3,
+  MAX_COUNTDOWN: 6,
+  CRYSTAL_BONUS_MULTIPLIER: 5,
+};
+
+export const INITIAL_STABILIZERS = 3;
 
 export const STATIONS: Station[] = [
   {

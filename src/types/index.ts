@@ -5,9 +5,10 @@ export type CandyType =
   | 'blueberry'
   | 'grape'
   | 'rainbow'
-  | 'bomb';
+  | 'bomb'
+  | 'crystal';
 
-export type SpecialCandyType = 'rainbow' | 'bomb' | null;
+export type SpecialCandyType = 'rainbow' | 'bomb' | 'crystal' | null;
 
 export interface Candy {
   id: string;
@@ -18,6 +19,9 @@ export interface Candy {
   specialType: SpecialCandyType;
   isMatched: boolean;
   isFalling: boolean;
+  isUnstable: boolean;
+  unstableStepsLeft: number | null;
+  isStabilized: boolean;
 }
 
 export interface Position {
@@ -92,6 +96,8 @@ export interface GameState {
   isAnimating: boolean;
   gamePhase: 'playing' | 'dispatching' | 'result' | 'gameover';
   dispatchResult: DispatchResult | null;
+  stabilizers: number;
+  stabilizerMode: boolean;
 }
 
 export interface DispatchResult {

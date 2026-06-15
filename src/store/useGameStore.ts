@@ -24,6 +24,10 @@ import {
   calculateScore,
   checkSwapHasSpecial,
   triggerSpecialCandy,
+  decrementUnstableCandies,
+  transformExpiredCandies,
+  convertMatchedUnstableToCrystal,
+  applyStabilizerToCandy,
 } from '@/engine/matchEngine';
 import { loadCandiesToTrain, clearTrain } from '@/engine/loadingSystem';
 import { calculateDispatchResult } from '@/engine/dispatchSystem';
@@ -38,7 +42,7 @@ import {
   clearGameState,
   recordDispatchStats,
 } from '@/utils/storage';
-import { INITIAL_TRAIN, GAME_CONFIG, STATIONS } from '@/data/config';
+import { INITIAL_TRAIN, GAME_CONFIG, STATIONS, INITIAL_STABILIZERS } from '@/data/config';
 
 interface GameStore {
   board: (Candy | null)[][];
@@ -56,6 +60,8 @@ interface GameStore {
   profile: PlayerProfile;
   stats: AllStats;
   showStats: boolean;
+  stabilizers: number;
+  stabilizerMode: boolean;
 
   selectCandy: (pos: Position) => void;
   processSwap: (pos1: Position, pos2: Position) => void;
@@ -66,6 +72,8 @@ interface GameStore {
   setShowStats: (show: boolean) => void;
   closeResult: () => void;
   changeStation: (stationId: string) => void;
+  toggleStabilizerMode: () => void;
+  useStabilizer: (pos: Position) => void;
   persist: () => void;
 }
 
@@ -90,6 +98,8 @@ const useGameStore = create<GameStore>((set, get) => {
     profile: initialProfile,
     stats: initialStats,
     showStats: false,
+    stabilizers: persisted?.stabilizers ?? INITIAL_STABILIZERS,
+    stabilizerMode: false,
 
     persist: () => {
       const s = get();
@@ -104,14 +114,23 @@ const useGameStore = create<GameStore>((set, get) => {
         maxCombo: s.maxCombo,
         gamePhase: s.gamePhase,
         dispatchResult: s.dispatchResult,
+        stabilizers: s.stabilizers,
       });
     },
 
     selectCandy: (pos: Position) => {
-      const { selectedCandy, board, isAnimating, gamePhase } = get();
+      const { selectedCandy, board, isAnimating, gamePhase, stabilizerMode, stabilizers } = get();
 
       if (isAnimating || gamePhase !== 'playing') return;
       if (!board[pos.row][pos.col]) return;
+
+      if (stabilizerMode && stabilizers > 0) {
+        const candy = board[pos.row][pos.col];
+        if (candy && candy.isUnstable && !candy.isStabilized) {
+          get().useStabilizer(pos);
+        }
+        return;
+      }
 
       if (!selectedCandy) {
         set({ selectedCandy: pos });
@@ -133,7 +152,9 @@ const useGameStore = create<GameStore>((set, get) => {
       const specialInfo = checkSwapHasSpecial(pos1, pos2, board);
 
       if (specialInfo.hasSpecial && specialInfo.specialPos && specialInfo.specialType) {
-        const newBoard = swapCandies(board, pos1, pos2);
+        let newBoard = swapCandies(board, pos1, pos2);
+        newBoard = decrementUnstableCandies(newBoard);
+        newBoard = transformExpiredCandies(newBoard);
         const forced = triggerSpecialCandy(
           newBoard,
           specialInfo.specialPos,
@@ -154,10 +175,13 @@ const useGameStore = create<GameStore>((set, get) => {
         return;
       }
 
-      const newBoard = swapCandies(board, pos1, pos2);
+      let newBoard = swapCandies(board, pos1, pos2);
       const matches = findAllMatches(newBoard);
 
       if (matches.length > 0) {
+        newBoard = decrementUnstableCandies(newBoard);
+        newBoard = transformExpiredCandies(newBoard);
+
         set({
           board: newBoard,
           moves: moves - 1,
@@ -209,6 +233,7 @@ const useGameStore = create<GameStore>((set, get) => {
           allMatches = [...allMatches, ...matches];
 
           currentBoard = markMatched(currentBoard, matches);
+          currentBoard = convertMatchedUnstableToCrystal(currentBoard, matches);
           set({ board: currentBoard });
 
           setTimeout(() => {
@@ -323,6 +348,8 @@ const useGameStore = create<GameStore>((set, get) => {
         moves: GAME_CONFIG.INITIAL_MOVES,
         combo: 0,
         maxCombo: 0,
+        stabilizers: INITIAL_STABILIZERS,
+        stabilizerMode: false,
       }));
 
       get().persist();
@@ -348,6 +375,8 @@ const useGameStore = create<GameStore>((set, get) => {
         dispatchResult: null,
         profile,
         stats: loadStats(),
+        stabilizers: INITIAL_STABILIZERS,
+        stabilizerMode: false,
       });
 
       clearGameState();
@@ -379,6 +408,28 @@ const useGameStore = create<GameStore>((set, get) => {
         currentOrder: newOrder,
         train: clearTrain(state.train),
       }));
+
+      get().persist();
+    },
+
+    toggleStabilizerMode: () => {
+      const { stabilizerMode, stabilizers } = get();
+      if (stabilizers <= 0 && !stabilizerMode) return;
+      set({ stabilizerMode: !stabilizerMode, selectedCandy: null });
+    },
+
+    useStabilizer: (pos: Position) => {
+      const { board, stabilizers } = get();
+      if (stabilizers <= 0) return;
+      const candy = board[pos.row][pos.col];
+      if (!candy || !candy.isUnstable || candy.isStabilized) return;
+
+      const newBoard = applyStabilizerToCandy(board, pos);
+      set({
+        board: newBoard,
+        stabilizers: stabilizers - 1,
+        stabilizerMode: false,
+      });
 
       get().persist();
     },
